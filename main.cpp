@@ -1,4 +1,5 @@
 #include "main.hpp"
+//#define DEBUG
 
 int main() {
 	setlocale(LC_ALL, "RU");
@@ -7,7 +8,6 @@ int main() {
 	ip::tcp::socket socket(context);
 	socket.connect(ip::tcp::endpoint(ip::make_address_v4(ip_address), port));
 	StartSession session(context, socket);
-	session._send_command();
 	context.run();
 }
 
@@ -15,6 +15,7 @@ StartSession::StartSession(io_context& context, ip::tcp::socket& socket)
 	: context{ context }, socket{ socket }, input(&buf)
 {
 	std::cout << "Подключение к серверу выполнено.\n";
+	_process_network();
 }
 
 StartSession::~StartSession()
@@ -72,15 +73,33 @@ void StartSession::_process_buffer(size_t bytes)
 	std::string line;
 	std::getline(input, line, '\f');
 
-	//Функционал --------------------------------------------------------------------|
-	if (line.starts_with("mes")) { _recive_mes(line); }
-	//else if (line.starts_with("")) {}
-	//Функционал --------------------------------------------------------------------|
+#ifdef DEBUG
+	std::cout << "Команда с сервера: " << line << std::endl;
+#endif 
 
-	_send_command();; //Гарант
+	//Функционал --------------------------------------------------------------------|
+	if (line.starts_with("mes") ) { _recive_mes(line); }
+	else if (line.starts_with("login")) { _set_login(line); }
+	//else if (line.starts_with("")) {}
+	else {
+		std::cout << "Команда с сервера не распознана.\n";
+		_send_command();
+	}
+	//Функционал --------------------------------------------------------------------|
 }
 
 void StartSession::_recive_mes(std::string line)
 {
 	std::cout << line.substr(line.find('|') + 1) << std::endl;
+	_send_command();
+}
+
+void StartSession::_set_login(std::string line)
+{
+	std::cout << line.substr(line.find('|') + 1);
+	std::string _line;
+	std::getline(std::cin, _line);
+	socket.send(buffer(_line + '\f'));
+	buf.consume(1);
+	_process_network();
 }

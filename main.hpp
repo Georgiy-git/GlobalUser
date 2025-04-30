@@ -22,7 +22,10 @@ public:
 	void _send_command();
 	void _process_buffer(size_t bytes);
 
+	//Функционал --------------------------------------------------------------------|
 	void _recive_mes(std::string);
+	void _set_login(std::string);
+	//Функционал --------------------------------------------------------------------|
 
 private:
 	streambuf buf;
