@@ -23,7 +23,6 @@ StartSession::~StartSession()
 	if (socket.is_open()) {
 		socket.close();
 	}
-	std::cout << "Деструктор выполнился.\n";
 }
 
 void StartSession::_process_network()
@@ -113,7 +112,7 @@ void StartSession::_load_file(std::string line)
 	std::string file_name = line.substr(line.find('}') + 1);
 	file_name = file_name.substr(0, file_name.find('|'));
 	std::size_t file_size = std::stoi(line.substr(line.find('|') + 1));
-	std::size_t quantity = file_size;
+	std::size_t quantity = 0;
 
 	std::ofstream file(file_name.c_str(), std::ios::binary);
 	if (!file.is_open()) {
@@ -121,19 +120,42 @@ void StartSession::_load_file(std::string line)
 		return;
 	}
 	
-	mutable_buffer _buf;
 	error_code ec;
 	std::cout << "Загрузка:   0%";
-	while (quantity > 0) {
-		quantity -= socket.read_some(_buf, ec);
+	auto start = std::chrono::steady_clock::now();
+	size_t one_procent = file_size / 100;
+
+	size_t pak = 8192;
+
+	while (quantity < file_size) {
+		size_t need_read = std::min(pak, file_size - quantity);
+		size_t rd = read(socket, buf, transfer_at_least(need_read), ec);
 		if (ec) {
-			std::cerr << "Ошибка при загрузке: " << ec.message() << std::endl;
+			std::cerr << "\nПроизошла ошибка при загрузке.\n";
 			return;
 		}
+
+		if (rd == 0) {
+			std::cerr << "\nСоединение закрыто сервером до завершения загрузки.\n";
+			file.close();
+			return;
+		}
+
+		file << &buf;
+		if (file.fail()) {
+			std::cerr << "\nПроизошла ошибка при загрузке.\n";
+			return;
+		}
+
+		quantity += rd;
 		std::cout << "\b\b\b\b" << std::setw(3) << std::right <<
-			(file_size - quantity) / (file_size / 100) << '%';
-		file << &_buf;
+			quantity / one_procent << "%";
 	}
-	std::cout << std::endl;
-	_process_network();
+	std::cout << "\rЗагрузка: 100%\n";
+	auto end = std::chrono::steady_clock::now();
+	std::cout << "Загрузка заняла " << std::setprecision(2) << std::fixed <<
+		std::chrono::duration<double>(end - start) << std::endl;
+
+	file.close();
+	_send_command();
 }
